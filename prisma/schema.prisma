@@ -1,0 +1,341 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// انا محتاج أشوف التشيكس هيتعمل فيها ايه، هل هكتبها مباشرة في بوستجريس ولا هعمل لها ملف منفصل
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+enum ItemType {
+  tour
+  package
+  product
+}
+
+enum Visibility {
+  visible
+  hidden
+}
+
+model User {
+  id           String   @id @default(uuid())
+  firstName    String   @map("first_name") @db.VarChar(50)
+  lastName     String   @map("last_name") @db.VarChar(50)
+  email        String   @unique @db.Text
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         UserRole @default(user)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  profile        Profile?
+  tourRatings    TourRating[]
+  productRatings ProductRating[]
+  tourComments   TourComment[]
+  productComments ProductComment[]
+  wishlist       Wishlist[]
+  cart           Cart[]
+
+  @@map("users")
+}
+model Profile {
+  id            String   @id
+  user          User     @relation(fields: [id], references: id, onDelete: Cascade)
+  city          String   @db.VarChar(80)
+  accommodation String   @db.Text
+  roomNumber    String   @map("room_number") @db.VarChar(8)
+  phoneNumber   String   @map("phone_number") @db.VarChar(15)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("profiles")
+}
+
+model City {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(80)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("cities")
+}
+
+model Language {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  tours     Tour[]
+
+  @@map("languages")
+}
+model Tour {
+  id                Int      @id @default(autoincrement())
+  title             String   @db.VarChar(100)
+  description       String?  @db.Text
+  languageId        Int      @map("language_id")
+  language          Language @relation(fields: [languageId], references: id, onDelete: Cascade)
+  
+  priceInPennies    Int      @map("price_in_pennies") 
+  discountPercentage Int      @default(0) @map("discount_percentage")
+  
+  pickupDate        DateTime @map("pickup_date") @db.Timestamptz
+  returnDate        DateTime @map("return_date") @db.Timestamptz
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  images     TourImage[]
+  videos     TourVideo[]
+  categories TourCategory[]
+  packages   PackageTour[]
+  ratings    TourRating[]
+  comments   TourComment[]
+  wishlist   Wishlist[]
+  cart       Cart[]
+
+  @@map("tours")
+}
+
+model Package {
+  id                  Int      @id @default(autoincrement())
+  title               String   @db.VarChar(255)
+  description         String?  @db.Text
+  totalPriceInPennies Int      @map("total_price_in_pennies")
+  discountPercentage  Int      @default(0) @map("discount_percentage")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tours    PackageTour[]
+  wishlist Wishlist[]
+  cart     Cart[]
+
+  @@map("packages")
+}
+
+model Product {
+  id                 Int      @id @default(autoincrement())
+  name               String   @db.VarChar(100)
+  description        String?  @db.Text
+  priceInPennies     Int      @map("price_in_pennies")
+  discountPercentage Int      @default(0) @map("discount_percentage")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  images     ProductImage[]
+  videos     ProductVideo[]
+  categories ProductCategory[]
+  ratings    ProductRating[]
+  comments   ProductComment[]
+  wishlist   Wishlist[]
+  cart       Cart[]
+
+  @@map("products")
+}
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tours    TourCategory[]
+  products ProductCategory[]
+
+  @@map("categories")
+}
+model TourCategory {
+  id         Int      @id @default(autoincrement())
+  tourId     Int      @map("tour_id")
+  categoryId Int      @map("category_id")
+  
+  tour       Tour     @relation(fields: [tourId], references: id, onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: id, onDelete: Cascade)
+
+  @@unique([categoryId, tourId])
+  @@map("tour_categories")
+}
+model ProductCategory {
+  id         Int      @id @default(autoincrement())
+  productId  Int      @map("product_id")
+  categoryId Int      @map("category_id")
+  
+  product    Product  @relation(fields: [productId], references: id, onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: id, onDelete: Cascade)
+
+  @@unique([categoryId, productId])
+  @@map("product_categories")
+}
+model PackageTour {
+  id        Int     @id @default(autoincrement())
+  packageId Int     @map("package_id")
+  tourId    Int     @map("tour_id")
+  
+  package   Package @relation(fields: [packageId], references: id, onDelete: Cascade)
+  tour      Tour    @relation(fields: [tourId], references: id, onDelete: Cascade)
+
+  @@unique([packageId, tourId])
+  @@map("package_tours")
+}
+model TourImage {
+  id        Int      @id @default(autoincrement())
+  url       String   @db.Text // هنا نطبق الـ URL Validation في الكود
+  tourId    Int      @map("tour_id")
+  tour      Tour     @relation(fields: [tourId], references: id, onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("tours_images")
+}
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  url       String   @db.Text
+  productId Int      @map("product_id")
+  product   Product  @relation(fields: [productId], references: id, onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("products_images")
+}
+model TourVideo {
+  id        Int      @id @default(autoincrement())
+  url       String   @db.Text
+  tourId    Int      @map("tour_id")
+  tour      Tour     @relation(fields: [tourId], references: id, onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("tours_videos")
+}
+model ProductVideo {
+  id        Int      @id @default(autoincrement())
+  url       String   @db.Text
+  productId Int      @map("product_id")
+  product   Product  @relation(fields: [productId], references: id, onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("products_videos")
+}
+model TourRating {
+  id        String     @id @default(uuid())
+  userId    String     @map("user_id")
+  tourId    Int        @map("tour_id")
+  rate      Int        // سنحقق من الـ (1-5) في الكود (rate_small_int)
+  status    Visibility @default(visible)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  editedAt  DateTime   @default(now()) @updatedAt @map("editet_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: id, onDelete: Cascade)
+  tour Tour @relation(fields: [tourId], references: id, onDelete: Cascade)
+
+  @@unique([userId, tourId])
+  @@map("tour_ratings")
+}
+
+model ProductRating {
+  id        String     @id @default(uuid())
+  userId    String     @map("user_id")
+  productId Int        @map("product_id")
+  rate      Int
+  status    Visibility @default(visible)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  editedAt  DateTime   @default(now()) @updatedAt @map("editet_at") @db.Timestamptz
+
+  user    User    @relation(fields: [userId], references: id, onDelete: Cascade)
+  product Product @relation(fields: [productId], references: id, onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("product_ratings")
+}
+model TourComment {
+  id        String     @id @default(uuid())
+  userId    String     @map("user_id")
+  tourId    Int        @map("tour_id")
+  comment   String     @db.Text
+  status    Visibility @default(visible)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user    User                          @relation(fields: [userId], references: id, onDelete: Cascade)
+  tour    Tour                          @relation(fields: [tourId], references: id, onDelete: Cascade)
+  history TourCommentEditHistory[]
+
+  @@unique([userId, tourId])
+  @@map("tour_comments")
+}
+
+model TourCommentEditHistory {
+  id         String   @id @default(uuid())
+  commentId  String   @map("comment_id")
+  oldComment String   @map("old_comment") @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  comment TourComment @relation(fields: [commentId], references: id, onDelete: Cascade)
+
+  @@map("tour_comments_edit_history")
+}
+model ProductComment {
+  id        String     @id @default(uuid())
+  userId    String     @map("user_id")
+  productId Int        @map("product_id")
+  comment   String     @db.Text
+  status    Visibility @default(visible)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user    User                           @relation(fields: [userId], references: id, onDelete: Cascade)
+  product Product                        @relation(fields: [productId], references: id, onDelete: Cascade)
+  history ProductCommentEditHistory[]
+
+  @@unique([userId, productId])
+  @@map("product_comments")
+}
+
+model ProductCommentEditHistory {
+  id         String   @id @default(uuid())
+  commentId  String   @map("comment_id")
+  oldComment String   @map("old_comment") @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  comment ProductComment @relation(fields: [commentId], references: id, onDelete: Cascade)
+
+  @@map("product_comments_edit_history")
+}
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tourId    Int?     @map("tour_id")
+  packageId Int?     @map("package_id")
+  productId Int?     @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user    User     @relation(fields: [userId], references: id, onDelete: Cascade)
+  tour    Tour?    @relation(fields: [tourId], references: id, onDelete: Cascade)
+  package Package? @relation(fields: [packageId], references: id, onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: id, onDelete: Cascade)
+
+  @@unique([userId, tourId])
+  @@unique([userId, packageId])
+  @@unique([userId, productId])
+  @@map("wish_list")
+}
+
+model Cart {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tourId    Int?     @map("tour_id")
+  packageId Int?     @map("package_id")
+  productId Int?     @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user    User     @relation(fields: [userId], references: id, onDelete: Cascade)
+  tour    Tour?    @relation(fields: [tourId], references: id, onDelete: Cascade)
+  package Package? @relation(fields: [packageId], references: id, onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: id, onDelete: Cascade)
+
+  @@unique([userId, tourId])
+  @@unique([userId, packageId])
+  @@unique([userId, productId])
+  @@map("cart")
+}
